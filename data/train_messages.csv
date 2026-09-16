@@ -1,0 +1,13 @@
+request_id,message,urgency,reason,writing_style,difficulty,source
+TR-C-001,"There is smoke coming from the electrical box",Critical,"Possible fire or electrical danger",Standard,Easy,"Manually written"
+TR-C-002,"cant breath good pls help now",Critical,"Possible breathing emergency","Plain English",Difficult,"Manually written"
+TR-C-003,"He is outside and said he will hurt me",Critical,"Possible immediate threat",Standard,Medium,"Manually written"
+TR-U-001,"We have had no running water since yesterday",Urgent,"Essential service unavailable",Standard,Easy,"Manually written"
+TR-U-002,"my medicine delivery not come and I need it today",Urgent,"Medication has been delayed","Plain English",Medium,"Manually written"
+TR-U-003,"The broken door lock has been reported three times",Urgent,"Repeated unresolved security problem",Standard,Medium,"Manually written"
+TR-R-001,"How can I update my postal address",Routine,"Administrative request",Standard,Easy,"Manually written"
+TR-R-002,"Please send me the fire safety information form",Routine,"Information request containing a danger word",Standard,Difficult,"Manually written"
+TR-R-003,"What time does the office open tomorrow",Routine,"General information request",Standard,Easy,"Manually written"
+TR-N-001,"Please help me with something",Uncertain,"Insufficient information",Vague,Easy,"Manually written"
+TR-N-002,"Something happened at home call me",Uncertain,"Possible concern without enough detail",Vague,Medium,"Manually written"
+TR-N-003,"I have a problem but cannot explain it here",Uncertain,"Issue is not described",Vague,Medium,"Manually written"
