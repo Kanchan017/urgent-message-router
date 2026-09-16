@@ -1,0 +1,37 @@
+# Python environment
+.venv/
+venv/
+
+# Python temporary files
+__pycache__/
+*.pyc
+*.pyo
+
+# VS Code
+.vscode/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Streamlit secrets
+.streamlit/secrets.toml
+
+# Environment variables and credentials
+.env
+*.key
+*.pem
+
+# Private or temporary audit data
+results/audit_log.jsonl
+logs/
+
+# Generated models
+models/*.joblib
+models/*.pkl
+
+# Temporary notebook files
+.ipynb_checkpoints/
+
+# Final test set remains private until the model is frozen
+data/test_messages.csv
