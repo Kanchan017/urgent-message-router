@@ -15,29 +15,49 @@ import re
 # 2. Regular-expression patterns describing dangerous situations.
 CRITICAL_RULES = {
     "person may be unconscious or unresponsive": [
-        (
-            r"\b(person|child|baby|infant|man|woman|mother|father|"
-            r"son|daughter|resident|pedestrian|worker|passenger|someone|"
-            r"he|she|they)\b.{0,50}"
-            r"\b(unconscious|unresponsive|motionless|not moving|"
-            r"not responding|not waking up|will not wake up)\b"
-        ),
-        r"\b(unconscious|unresponsive)\s+(person|child|resident|worker)\b",
-    ],
+    (
+        r"\b(person|child|baby|infant|man|woman|mother|father|"
+        r"son|daughter|resident|pedestrian|worker|passenger|someone|"
+        r"he|she|they|i)\b.{0,50}"
+        r"\b(unconscious|unresponsive|motionless|not moving|"
+        r"not responding|not waking up|will not wake up|"
+        r"fainted|fainting|passed out|passing out|"
+        r"going to faint|gonna faint|about to faint)\b"
+    ),
+    r"\b(unconscious|unresponsive)\s+(person|child|resident|worker)\b",
+    r"\b(gonna|going to|about to)\s+(faint|pass out|collapse)\b",
+],
+  "severe breathing difficulty or choking": [
+    (
+        r"\b(not breathing|cannot breathe|can't breathe|"
+        r"unable to breathe|barely breathing)\b"
+    ),
+    (
+        r"\b(breathing problem|breathing problems|"
+        r"difficulty breathing|trouble breathing|"
+        r"hard to breathe|shortness of breath)\b"
+    ),
+    r"\bbreathing is (hard|difficult|getting worse)\b",
+    r"\b(cannot|can't)\s+catch\s+(my|his|her|their)?\s*breath\b",
+    r"\b(gasping for air|choking|choked)\b",
+    r"\bstruggling to breathe\b",
+    r"\blips (look |are )?blue\b",
+],
 
-    "severe breathing difficulty or choking": [
-        r"\b(not breathing|cannot breathe|can't breathe|barely breathing)\b",
-        r"\b(choking|choked)\b",
-        r"\bstruggling to breathe\b",
-        r"\blips (look |are )?blue\b",
-    ],
-
-    "active fire, explosion or dangerous smoke": [
-        r"\b(on fire|burning|flames are|flames coming|fire is spreading)\b",
-        r"\b(thick black smoke|smoke is filling|smoke filling)\b",
-        r"\b(exploded|explosion)\b",
-        r"\bfire\b.{0,40}\b(trapped|cannot get out|can't get out)\b",
-    ],
+   "active fire, explosion or dangerous smoke": [
+    r"\b(on fire|burning|flames are|flames coming|fire is spreading)\b",
+    (
+        r"\bfire\b.{0,30}"
+        r"\b(house|home|building|unit|apartment|room|kitchen|property)\b"
+    ),
+    (
+        r"\b(house|home|building|unit|apartment|room|kitchen)\b"
+        r".{0,30}\b(fire|burning|flames|filled with smoke)\b"
+    ),
+    r"\b(thick black smoke|smoke is filling|smoke filling)\b",
+    r"\b(exploded|explosion)\b",
+    r"\bfire\b.{0,40}\b(trapped|cannot get out|can't get out)\b",
+],
 
     "active violence or weapon threat": [
         r"\b(stabbed|stabbing|shot|shooting)\b",
@@ -77,6 +97,19 @@ CRITICAL_RULES = {
     "severe structural danger": [
         r"\b(ceiling|roof|wall|balcony|veranda)\b.{0,30}\b(collapsing|collapsed)\b",
         r"\bretaining wall\b.{0,30}\bcollapsing\b",
+    ],
+        "fall from height or major traumatic injury": [
+        (
+            r"\b(i|person|child|baby|girl|boy|man|woman|someone|"
+            r"worker|resident|he|she|they)\b.{0,40}"
+            r"\b(fell|fallen|fall|jumped)\b.{0,30}"
+            r"\b(from|off)\b.{0,25}"
+            r"\b(first|second|third|fourth|1st|2nd|3rd|4th|"
+            r"floor|storey|story|roof|balcony|ladder|scaffold|height)\b"
+        ),
+        r"\b(hit|struck|run over)\b.{0,25}\b(car|truck|bus|vehicle|motorbike)\b",
+        r"\b(heavy|severe|uncontrolled)\b.{0,20}\b(bleeding|blood loss)\b",
+        r"\b(head injury|crushed|severed limb|amputation)\b",
     ],
 }
 
