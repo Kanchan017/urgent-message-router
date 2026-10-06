@@ -1,0 +1,13 @@
+{
+    "validation_messages": 80,
+    "model_only": {
+        "accuracy": 0.6875,
+        "critical_recall": 0.65
+    },
+    "model_plus_safety_rules": {
+        "accuracy": 0.7625,
+        "critical_recall": 0.95
+    },
+    "safety_rules_triggered": 12,
+    "model_recommendations_overridden": 6
+}

@@ -34,4 +34,6 @@ models/*.pkl
 .ipynb_checkpoints/
 
 # Final test set remains private until the model is frozen
-data/test_messages.csv
+data/test_messages.csvresults/human_decision_log.csv
+results/prioritylink_queue.db
+results/human_decision_log.csv

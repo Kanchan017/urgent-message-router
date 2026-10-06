@@ -1,0 +1,81 @@
+message_id,message,expected_label,model_prediction,model_confidence,safety_rule_triggered,safety_reason,combined_recommendation,recommendation_overridden,model_correct,combined_correct
+VA-C-01,A person at the shelter is unconscious and I cannot wake them.,Critical,Urgent,0.3711407976733244,True,person may be unconscious or unresponsive,Critical,True,False,True
+VA-C-02,Flames are coming through the roof of the occupied unit.,Critical,Critical,0.40626607685453253,True,"active fire, explosion or dangerous smoke",Critical,False,True,True
+VA-C-03,My child cannot breathe after eating and their face is swelling.,Critical,Urgent,0.32519893558489454,True,severe breathing difficulty or choking,Critical,True,False,True
+VA-C-04,A vehicle has hit a pedestrian who is not moving.,Critical,Urgent,0.5516934429086054,True,person may be unconscious or unresponsive,Critical,True,False,True
+VA-C-05,There is a strong chemical smell and three workers have collapsed.,Critical,Critical,0.4849770443956916,False,,Critical,False,True,True
+VA-C-06,The river swept him away and we can no longer see him.,Critical,Critical,0.34931952389907717,False,,Critical,False,True,True
+VA-C-07,A resident is trapped under a fallen tree.,Critical,Critical,0.3534418855411778,True,drowning or person trapped,Critical,False,True,True
+VA-C-08,She is holding tablets and saying goodbye to everyone.,Critical,Critical,0.5086874514001336,False,,Critical,False,True,True
+VA-C-09,The generator is on fire beside the sleeping cabins.,Critical,Critical,0.3542440556926627,True,"active fire, explosion or dangerous smoke",Critical,False,True,True
+VA-C-10,Someone has been stabbed outside the hall.,Critical,Urgent,0.42029453166403213,True,active violence or weapon threat,Critical,True,False,True
+VA-C-11,My infant is limp and barely breathing.,Critical,Critical,0.6207822917831262,True,severe breathing difficulty or choking,Critical,False,True,True
+VA-C-12,The balcony is breaking away while people are standing on it.,Critical,Critical,0.48977585021942327,False,,Critical,False,True,True
+VA-C-13,A tanker has overturned and liquid is leaking toward homes.,Critical,Critical,0.48783645243696283,False,,Critical,False,True,True
+VA-C-14,The bushfire has crossed the road and surrounded our property.,Critical,Urgent,0.4142735345774054,False,,Urgent,False,False,False
+VA-C-15,Two people are fighting and one has a metal bar.,Critical,Critical,0.566326656304237,False,,Critical,False,True,True
+VA-C-16,My husband has severe chest pain and has collapsed.,Critical,Critical,0.6111275325729131,False,,Critical,False,True,True
+VA-C-17,The electrical box exploded and a worker is on the ground.,Critical,Critical,0.48866049377609116,True,"active fire, explosion or dangerous smoke; serious electrical or gas hazard",Critical,False,True,True
+VA-C-18,A child has fallen into the water tank.,Critical,Urgent,0.37775411005564963,True,drowning or person trapped,Critical,True,False,True
+VA-C-19,The gas cylinder is hissing beside an open flame.,Critical,Urgent,0.34459796881647126,True,serious electrical or gas hazard,Critical,True,False,True
+VA-C-20,I am locked in a room while someone is trying to break in.,Critical,Critical,0.5435576842081178,True,active violence or weapon threat,Critical,False,True,True
+VA-U-01,"The clinic refrigerator alarm has been sounding, but the medicine is still cool.",Urgent,Urgent,0.5891055411283553,False,,Urgent,False,True,True
+VA-U-02,Our accessible bathroom is unusable because the handrail came away.,Urgent,Urgent,0.4267743717590587,False,,Urgent,False,True,True
+VA-U-03,Rain is entering through a cracked ceiling and the crack is growing.,Urgent,Urgent,0.47430233421636286,False,,Urgent,False,True,True
+VA-U-04,My welfare appointment was cancelled and I have no accommodation after tomorrow.,Urgent,Urgent,0.45950462322798036,False,,Urgent,False,True,True
+VA-U-05,The school crossing signal is not working before tomorrow morning.,Urgent,Urgent,0.4365461449169488,False,,Urgent,False,True,True
+VA-U-06,"A resident’s oxygen delivery has not arrived, but one cylinder remains.",Urgent,Urgent,0.47543276638541704,False,,Urgent,False,True,True
+VA-U-07,Sewage is pooling outside the childcare entrance.,Urgent,Critical,0.30834463482293256,False,,Critical,False,False,False
+VA-U-08,The only ramp into the office is blocked by building materials.,Urgent,Urgent,0.3928351990345725,False,,Urgent,False,True,True
+VA-U-09,"A domestic violence order was breached by messages, and the sender is elsewhere.",Urgent,Urgent,0.5099387724540679,False,,Urgent,False,True,True
+VA-U-10,The water pump is failing and the community tank level is low.,Urgent,Urgent,0.5761319171874065,False,,Urgent,False,True,True
+VA-U-11,A diabetic resident has enough medication only until tomorrow.,Urgent,Urgent,0.5305114434521024,False,,Urgent,False,True,True
+VA-U-12,The bedroom window will not lock and the resident lives alone.,Urgent,Urgent,0.46186167911111403,False,,Urgent,False,True,True
+VA-U-13,The food-service freezer temperature has risen above the safe range.,Urgent,Urgent,0.4792077591005147,False,,Urgent,False,True,True
+VA-U-14,A large pothole is forcing cars into the opposite lane.,Urgent,Critical,0.4082689435118002,False,,Critical,False,False,False
+VA-U-15,The heat warning starts tomorrow and the cooling centre door is broken.,Urgent,Urgent,0.6374825333903438,False,,Urgent,False,True,True
+VA-U-16,A person sleeping rough says their inhaler was stolen.,Urgent,Critical,0.33857862892600776,False,,Critical,False,False,False
+VA-U-17,The family has received an eviction notice effective tomorrow.,Urgent,Urgent,0.4327885621497554,False,,Urgent,False,True,True
+VA-U-18,The lift is broken in a building where residents use wheelchairs.,Urgent,Critical,0.33125826648727585,False,,Critical,False,False,False
+VA-U-19,A threatening caller knows my address but has not arrived.,Urgent,Urgent,0.367557969326604,False,,Urgent,False,True,True
+VA-U-20,The storm damaged the roof and more rain is forecast tonight.,Urgent,Urgent,0.46696275595563347,False,,Urgent,False,True,True
+VA-R-01,Could you email me the opening hours for the library?,Routine,Routine,0.5923173571152662,False,,Routine,False,True,True
+VA-R-02,I want to move my appointment from Tuesday to Thursday next month.,Routine,Routine,0.6368811591576196,False,,Routine,False,True,True
+VA-R-03,Please send a receipt for the fee I paid yesterday.,Routine,Routine,0.5227771508897583,False,,Routine,False,True,True
+VA-R-04,The flyscreen has a small tear and can be replaced during the next visit.,Routine,Routine,0.38863095183911023,False,,Routine,False,True,True
+VA-R-05,I am furious—your website displays my middle initial incorrectly.,Routine,Critical,0.26716869009770605,False,,Critical,False,False,False
+VA-R-06,URGENT!!! What activities are planned for the community fair?,Routine,Routine,0.4015320262540247,False,,Routine,False,True,True
+VA-R-07,Can I collect printed grant guidelines from the office?,Routine,Routine,0.33472487824900055,False,,Routine,False,True,True
+VA-R-08,Please remove my old telephone number from my profile.,Routine,Critical,0.3330912898975818,False,,Critical,False,False,False
+VA-R-09,The hallway paint is faded and should be refreshed sometime.,Routine,Urgent,0.3073299464677856,False,,Urgent,False,False,False
+VA-R-10,I would like to compliment the officer who helped me.,Routine,Routine,0.45499411985828847,False,,Routine,False,True,True
+VA-R-11,Can you explain how long ordinary applications usually take?,Routine,Routine,0.5128009951677743,False,,Routine,False,True,True
+VA-R-12,Please reserve a meeting room for next month.,Routine,Routine,0.5939019944840734,False,,Routine,False,True,True
+VA-R-13,The mailbox number plate is loose but still attached.,Routine,Routine,0.3795038647157444,False,,Routine,False,True,True
+VA-R-14,I forgot my online password and need a reset link.,Routine,Uncertain,0.2965483321237671,False,,Uncertain,False,False,False
+VA-R-15,Could you provide the minutes from the public meeting?,Routine,Routine,0.45661469374970526,False,,Routine,False,True,True
+VA-R-16,I need the form immediately because I am leaving for holiday.,Routine,Routine,0.5455372117102383,False,,Routine,False,True,True
+VA-R-17,The ceiling fan squeaks but operates normally.,Routine,Routine,0.270291243063023,False,,Routine,False,True,True
+VA-R-18,Please update my language preference to Nepali.,Routine,Routine,0.5216711757618364,False,,Routine,False,True,True
+VA-R-19,Can I change to paperless statements?,Routine,Routine,0.5119821053787815,False,,Routine,False,True,True
+VA-R-20,What documents should I bring to an appointment in three weeks?,Routine,Routine,0.4347113764321207,False,,Routine,False,True,True
+VA-N-01,"There is smoke somewhere, I cannot see where and there is no smell now.",Uncertain,Urgent,0.35479325172401516,False,,Urgent,False,False,False
+VA-N-02,My neighbour said something serious happened.,Uncertain,Uncertain,0.39319766649344856,False,,Uncertain,False,True,True
+VA-N-03,I need medicine soon but I still have some left.,Uncertain,Uncertain,0.3243903671067836,False,,Uncertain,False,True,True
+VA-N-04,The child is acting different today.,Uncertain,Urgent,0.3939418595106151,False,,Urgent,False,False,False
+VA-N-05,A wire looks wrong near the building.,Uncertain,Routine,0.3170305301398825,False,,Routine,False,False,False
+VA-N-06,Please treat this as critical; it is about my account.,Uncertain,Uncertain,0.35715530672804247,False,,Uncertain,False,True,True
+VA-N-07,"There was a fight earlier. Everyone has gone, I think.",Uncertain,Uncertain,0.31855604861645975,False,,Uncertain,False,True,True
+VA-N-08,I heard a loud bang from the empty unit.,Uncertain,Critical,0.3076548124596953,False,,Critical,False,False,False
+VA-N-09,The water is a strange colour sometimes.,Uncertain,Urgent,0.3914596089246332,False,,Urgent,False,False,False
+VA-N-10,I cannot find him.,Uncertain,Urgent,0.37247329624056014,False,,Urgent,False,False,False
+VA-N-11,The door is open again.,Uncertain,Uncertain,0.33546686273465015,False,,Uncertain,False,True,True
+VA-N-12,She said she cannot continue like this.,Uncertain,Uncertain,0.2704561398090867,False,,Uncertain,False,True,True
+VA-N-13,Something touched the power box.,Uncertain,Urgent,0.2770941779943613,False,,Urgent,False,False,False
+VA-N-14,We might need somewhere else to stay.,Uncertain,Uncertain,0.31596924508677826,False,,Uncertain,False,True,True
+VA-N-15,It hurts more now.,Uncertain,Uncertain,0.4111878266367986,False,,Uncertain,False,True,True
+VA-N-16,The animal is back near the homes.,Uncertain,Uncertain,0.2832387334384738,False,,Uncertain,False,True,True
+VA-N-17,"The alarm went off, then stopped by itself.",Uncertain,Urgent,0.3605684390207924,False,,Urgent,False,False,False
+VA-N-18,I saw someone watching the office.,Uncertain,Routine,0.30738661348023444,False,,Routine,False,False,False
+VA-N-19,There is a crack near the roof.,Uncertain,Urgent,0.30084886387864074,False,,Urgent,False,False,False
+VA-N-20,Call me now about what the worker did.,Uncertain,Uncertain,0.43203598254776454,False,,Uncertain,False,True,True
