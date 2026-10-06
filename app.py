@@ -1,5 +1,9 @@
+"""Streamlit interface for the PriorityLink prototype."""
+
 import csv
 import hashlib
+import json
+import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -8,289 +12,327 @@ import streamlit as st
 from triage import triage_message
 
 
-# =========================================================
-# 1. PAGE SETTINGS
-# =========================================================
+# -----------------------------------------------------------------------------
+# Page configuration
+# -----------------------------------------------------------------------------
+
 st.set_page_config(
-    page_title="PriorityLink | Urgent Message Router",
-    page_icon="🛡️",
+    page_title="PriorityLink",
+    page_icon="📨",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
 
-# =========================================================
-# 2. CONSTANTS
-# =========================================================
+# -----------------------------------------------------------------------------
+# Application constants
+# -----------------------------------------------------------------------------
+
 CATEGORIES = ["Critical", "Urgent", "Routine", "Uncertain"]
 
+PRIORITY_ORDER = {
+    "Critical": 1,
+    "Urgent": 2,
+    "Uncertain": 3,
+    "Routine": 4,
+}
+
 AUDIT_LOG_PATH = Path("results/human_decision_log.csv")
+QUEUE_DATABASE_PATH = Path("results/prioritylink_queue.db")
+MAXIMUM_MESSAGE_LENGTH = 5000
+
+EXAMPLE_MESSAGES = {
+    "Critical": (
+        "A child has fallen into the water tank and is not responding."
+    ),
+    "Urgent": (
+        "Our only toilet is blocked and overflowing onto the floor."
+    ),
+    "Routine": "Please update my postal address.",
+    "Uncertain": (
+        "Something happened near my house and I need someone to help."
+    ),
+}
 
 CATEGORY_STYLES = {
     "Critical": {
-        "icon": "🚨",
         "css_class": "critical",
-        "title": "Immediate escalation",
-        "route": "Emergency human-review queue",
+        "heading": "Immediate human review",
         "description": (
             "The message may describe an immediate threat to life, "
             "safety or property."
         ),
+        "route": "Immediate review queue",
     },
     "Urgent": {
-        "icon": "⚠️",
         "css_class": "urgent",
-        "title": "Priority review",
-        "route": "Priority human-review queue",
+        "heading": "Priority human review",
         "description": (
-            "The message requires prompt attention from a human officer."
+            "The message requires prompt attention from an officer."
         ),
+        "route": "Priority review queue",
     },
     "Routine": {
-        "icon": "✓",
         "css_class": "routine",
-        "title": "Standard processing",
-        "route": "Normal human-review queue",
+        "heading": "Standard review",
         "description": (
-            "No explicit immediate danger was identified, but a human "
-            "still makes the final decision."
+            "The message can enter the normal human-review workflow."
         ),
+        "route": "Standard review queue",
     },
     "Uncertain": {
-        "icon": "?",
         "css_class": "uncertain",
-        "title": "Clarification required",
-        "route": "Human clarification queue",
+        "heading": "Clarification required",
         "description": (
-            "The information is insufficient or conflicting. "
-            "Uncertain does not mean safe or low priority."
+            "The available information or model evidence is not strong "
+            "enough for a reliable category."
         ),
+        "route": "Clarification queue",
     },
 }
 
 
-# =========================================================
-# 3. CUSTOM USER-INTERFACE DESIGN
-# =========================================================
+# -----------------------------------------------------------------------------
+# Simple operational styling
+# -----------------------------------------------------------------------------
+
 st.markdown(
     """
     <style>
-        /* Main application background */
+        :root {
+            --page: #0b1220;
+            --surface: #111a2b;
+            --surface-2: #162237;
+            --border: #2b3a55;
+            --text: #f3f6fb;
+            --muted: #9eacc2;
+            --blue: #4f8cff;
+            --blue-hover: #3d75dd;
+            --critical: #e05252;
+            --urgent: #d99a36;
+            --routine: #3ea66b;
+            --uncertain: #5b8def;
+        }
+
         .stApp {
-            background:
-                radial-gradient(
-                    circle at 90% 5%,
-                    rgba(37, 99, 235, 0.12),
-                    transparent 25%
-                ),
-                radial-gradient(
-                    circle at 10% 90%,
-                    rgba(14, 165, 233, 0.08),
-                    transparent 25%
-                ),
-                #07101f;
+            background: var(--page);
+            color: var(--text);
         }
 
-        /* Main page width */
+        [data-testid="stHeader"] {
+            background: var(--page);
+        }
+
         .block-container {
-            max-width: 1250px;
-            padding-top: 2rem;
-            padding-bottom: 4rem;
+            max-width: 1180px;
+            padding-top: 4.25rem;
+            padding-bottom: 3rem;
         }
 
-        /* Sidebar */
-        section[data-testid="stSidebar"] {
-            background: #091426;
-            border-right: 1px solid rgba(148, 163, 184, 0.18);
+        #MainMenu,
+        footer {
+            visibility: hidden;
         }
 
-        /* Main hero section */
-        .hero {
-            padding: 2rem;
-            border-radius: 24px;
-            background:
-                linear-gradient(
-                    120deg,
-                    rgba(30, 64, 175, 0.34),
-                    rgba(8, 145, 178, 0.17)
-                );
-            border: 1px solid rgba(96, 165, 250, 0.25);
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
-            margin-bottom: 1.5rem;
+        h1, h2, h3 {
+            color: var(--text) !important;
+            letter-spacing: -0.02em;
         }
 
-        .brand-line {
-            color: #7dd3fc;
-            font-size: 0.78rem;
-            font-weight: 800;
-            letter-spacing: 0.16em;
-            text-transform: uppercase;
-            margin-bottom: 0.6rem;
+        h1 {
+            margin-bottom: 0.2rem !important;
         }
 
-        .hero h1 {
-            color: #f8fafc;
-            font-size: 2.7rem;
-            line-height: 1.1;
-            margin: 0;
+        p, label {
+            color: #d8e0ec;
         }
 
-        .hero p {
-            color: #cbd5e1;
-            font-size: 1.05rem;
-            max-width: 780px;
-            margin-top: 0.8rem;
-            margin-bottom: 0;
+        .app-intro {
+            color: #b5c1d3;
+            font-size: 1rem;
+            margin: 0 0 0.35rem 0;
         }
 
-        /* Small statistics */
-        .stat-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 0.8rem;
-            margin-top: 1.5rem;
+        .section-note {
+            color: var(--muted);
+            font-size: 0.82rem;
         }
 
-        .stat-card {
-            padding: 1rem;
-            background: rgba(15, 23, 42, 0.63);
-            border: 1px solid rgba(148, 163, 184, 0.17);
-            border-radius: 15px;
-        }
-
-        .stat-value {
-            color: #f8fafc;
-            font-size: 1.45rem;
-            font-weight: 800;
-        }
-
-        .stat-label {
-            color: #94a3b8;
-            font-size: 0.78rem;
-            margin-top: 0.15rem;
-        }
-
-        /* Recommendation cards */
-        .risk-card {
-            padding: 1.5rem;
-            border-radius: 20px;
-            margin: 0.7rem 0 1.2rem 0;
-            border-left: 7px solid;
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
-        }
-
-        .risk-card.critical {
-            background: linear-gradient(
-                100deg,
-                rgba(127, 29, 29, 0.58),
-                rgba(69, 10, 10, 0.25)
-            );
-            border-color: #ef4444;
-        }
-
-        .risk-card.urgent {
-            background: linear-gradient(
-                100deg,
-                rgba(120, 53, 15, 0.58),
-                rgba(69, 26, 3, 0.25)
-            );
-            border-color: #f59e0b;
-        }
-
-        .risk-card.routine {
-            background: linear-gradient(
-                100deg,
-                rgba(20, 83, 45, 0.55),
-                rgba(5, 46, 22, 0.25)
-            );
-            border-color: #22c55e;
-        }
-
-        .risk-card.uncertain {
-            background: linear-gradient(
-                100deg,
-                rgba(30, 64, 175, 0.55),
-                rgba(30, 58, 138, 0.25)
-            );
-            border-color: #60a5fa;
-        }
-
-        .risk-heading {
-            color: #ffffff;
-            font-size: 1.65rem;
-            font-weight: 800;
-            margin-bottom: 0.3rem;
-        }
-
-        .risk-description {
-            color: #e2e8f0;
-            margin-bottom: 0.8rem;
-        }
-
-        .route-pill {
-            display: inline-block;
-            color: #f8fafc;
-            background: rgba(15, 23, 42, 0.65);
-            border: 1px solid rgba(255, 255, 255, 0.16);
-            border-radius: 999px;
-            padding: 0.35rem 0.8rem;
-            font-size: 0.8rem;
-            font-weight: 700;
-        }
-
-        /* Streamlit components */
         div[data-testid="stMetric"] {
-            background: rgba(15, 23, 42, 0.72);
-            border: 1px solid rgba(148, 163, 184, 0.17);
-            border-radius: 16px;
-            padding: 1rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 7px;
+            padding: 0.85rem 0.95rem;
         }
 
         div[data-testid="stMetricLabel"] {
-            color: #94a3b8;
+            color: var(--muted);
         }
 
         div[data-testid="stMetricValue"] {
-            color: #f8fafc;
+            color: var(--text);
+        }
+
+        div[data-baseweb="textarea"] {
+            background: var(--surface) !important;
+            border: 1px solid var(--border) !important;
+            border-radius: 7px !important;
+        }
+
+        div[data-baseweb="textarea"]:focus-within {
+            border-color: var(--blue) !important;
+            box-shadow: 0 0 0 1px var(--blue);
+        }
+
+        div[data-baseweb="textarea"] textarea {
+            background: transparent !important;
+            color: var(--text) !important;
+            -webkit-text-fill-color: var(--text) !important;
+        }
+
+        div[data-baseweb="textarea"] textarea::placeholder {
+            color: #6f8099 !important;
+        }
+
+        div[data-baseweb="select"] > div,
+        div[data-baseweb="input"] > div {
+            background: var(--surface) !important;
+            border-color: var(--border) !important;
+            color: var(--text) !important;
+        }
+
+        div[data-baseweb="select"] span,
+        div[data-baseweb="input"] input {
+            color: var(--text) !important;
+        }
+
+        div.stButton > button,
+        div[data-testid="stFormSubmitButton"] > button {
+            border-radius: 6px !important;
+            min-height: 2.65rem;
+            font-weight: 650;
+        }
+
+        div.stButton > button[kind="secondary"] {
+            background: var(--surface) !important;
+            border: 1px solid var(--border) !important;
+            color: #dce5f2 !important;
+        }
+
+        div.stButton > button[kind="secondary"] p {
+            color: #dce5f2 !important;
+        }
+
+        div.stButton > button[kind="secondary"]:hover {
+            background: var(--surface-2) !important;
+            border-color: #58709a !important;
+        }
+
+        div.stButton > button[kind="primary"],
+        div[data-testid="stFormSubmitButton"] > button {
+            background: var(--blue) !important;
+            border: 1px solid var(--blue) !important;
+            color: #ffffff !important;
+        }
+
+        div.stButton > button[kind="primary"] p,
+        div[data-testid="stFormSubmitButton"] > button p {
+            color: #ffffff !important;
+        }
+
+        div.stButton > button[kind="primary"]:hover,
+        div[data-testid="stFormSubmitButton"] > button:hover {
+            background: var(--blue-hover) !important;
+            border-color: var(--blue-hover) !important;
         }
 
         div[data-testid="stForm"] {
-            background: rgba(15, 23, 42, 0.62);
-            border: 1px solid rgba(148, 163, 184, 0.20);
-            border-radius: 18px;
-            padding: 1.2rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
         }
 
-        .stButton > button,
-        .stFormSubmitButton > button {
-            border-radius: 11px;
-            font-weight: 700;
-            min-height: 2.8rem;
+        [data-testid="stExpander"] {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 7px;
         }
 
-        .privacy-note {
-            color: #94a3b8;
-            font-size: 0.82rem;
-            padding: 0.8rem 1rem;
-            border-left: 3px solid #38bdf8;
-            background: rgba(14, 165, 233, 0.07);
-            border-radius: 5px 12px 12px 5px;
+        .priority-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-left: 5px solid;
+            border-radius: 7px;
+            padding: 1.1rem 1.2rem;
+            margin: 0.65rem 0 1rem 0;
         }
 
-        .footer-note {
-            color: #64748b;
-            text-align: center;
-            font-size: 0.78rem;
-            margin-top: 3rem;
+        .priority-card.critical {
+            border-left-color: var(--critical);
         }
 
-        @media (max-width: 750px) {
-            .stat-grid {
-                grid-template-columns: 1fr;
-            }
+        .priority-card.urgent {
+            border-left-color: var(--urgent);
+        }
 
-            .hero h1 {
-                font-size: 2rem;
+        .priority-card.routine {
+            border-left-color: var(--routine);
+        }
+
+        .priority-card.uncertain {
+            border-left-color: var(--uncertain);
+        }
+
+        .priority-label {
+            color: var(--muted);
+            font-size: 0.72rem;
+            font-weight: 750;
+            letter-spacing: 0.1em;
+            margin-bottom: 0.3rem;
+        }
+
+        .priority-card.critical .priority-label {
+            color: #f17b7b;
+        }
+
+        .priority-card.urgent .priority-label {
+            color: #edb85e;
+        }
+
+        .priority-card.routine .priority-label {
+            color: #72c995;
+        }
+
+        .priority-card.uncertain .priority-label {
+            color: #8eb1f4;
+        }
+
+        .priority-heading {
+            color: var(--text);
+            font-size: 1.25rem;
+            font-weight: 720;
+            margin-bottom: 0.3rem;
+        }
+
+        .priority-description {
+            color: #c4cfde;
+            line-height: 1.5;
+            margin-bottom: 0.55rem;
+        }
+
+        .priority-meta {
+            color: var(--muted);
+            font-size: 0.8rem;
+        }
+
+        hr {
+            border-color: var(--border) !important;
+        }
+
+        @media (max-width: 760px) {
+            .block-container {
+                padding-top: 4rem;
             }
         }
     </style>
@@ -299,18 +341,179 @@ st.markdown(
 )
 
 
-# =========================================================
-# 4. HELPER FUNCTIONS
-# =========================================================
-def create_message_id(message):
-    """
-    Converts a message into a short anonymous identifier.
+# -----------------------------------------------------------------------------
+# State and audit helpers
+# -----------------------------------------------------------------------------
 
-    The original message is not saved in the audit log.
-    """
+
+def connect_to_queue_database():
+    """Open the local database used for persistent queue records."""
+
+    QUEUE_DATABASE_PATH.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    connection = sqlite3.connect(
+        QUEUE_DATABASE_PATH,
+        timeout=10,
+    )
+    connection.row_factory = sqlite3.Row
+    return connection
+
+
+def initialise_queue_database():
+    """Create the persistent queue table when it does not exist."""
+
+    with connect_to_queue_database() as connection:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS review_cases (
+                case_id TEXT PRIMARY KEY,
+                sequence INTEGER NOT NULL UNIQUE,
+                message TEXT NOT NULL,
+                category TEXT NOT NULL,
+                confidence REAL NOT NULL,
+                safety_triggered INTEGER NOT NULL,
+                status TEXT NOT NULL,
+                final_category TEXT NOT NULL,
+                result_json TEXT NOT NULL,
+                created_at_utc TEXT NOT NULL
+            )
+            """
+        )
+
+
+def load_review_queue():
+    """Load all saved queue cases from the local database."""
+
+    with connect_to_queue_database() as connection:
+        rows = connection.execute(
+            """
+            SELECT
+                case_id,
+                sequence,
+                message,
+                category,
+                confidence,
+                safety_triggered,
+                status,
+                final_category,
+                result_json
+            FROM review_cases
+            ORDER BY sequence
+            """
+        ).fetchall()
+
+    return [
+        {
+            "case_id": row["case_id"],
+            "sequence": int(row["sequence"]),
+            "message": row["message"],
+            "category": row["category"],
+            "confidence": float(row["confidence"]),
+            "safety_triggered": bool(
+                row["safety_triggered"]
+            ),
+            "status": row["status"],
+            "final_category": row["final_category"],
+            "result": json.loads(row["result_json"]),
+        }
+        for row in rows
+    ]
+
+
+def save_queue_item(queue_item):
+    """Write one newly assessed case to the persistent queue."""
+
+    with connect_to_queue_database() as connection:
+        connection.execute(
+            """
+            INSERT INTO review_cases (
+                case_id,
+                sequence,
+                message,
+                category,
+                confidence,
+                safety_triggered,
+                status,
+                final_category,
+                result_json,
+                created_at_utc
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                queue_item["case_id"],
+                queue_item["sequence"],
+                queue_item["message"],
+                queue_item["category"],
+                queue_item["confidence"],
+                int(queue_item["safety_triggered"]),
+                queue_item["status"],
+                queue_item["final_category"],
+                json.dumps(
+                    queue_item["result"],
+                    ensure_ascii=False,
+                    default=str,
+                ),
+                datetime.now(timezone.utc).isoformat(),
+            ),
+        )
+
+
+def save_review_status(case_id, final_category):
+    """Persist the final human-review status for one case."""
+
+    with connect_to_queue_database() as connection:
+        connection.execute(
+            """
+            UPDATE review_cases
+            SET status = ?, final_category = ?
+            WHERE case_id = ?
+            """,
+            (
+                "Reviewed",
+                final_category,
+                case_id,
+            ),
+        )
+
+
+def initialise_state():
+    """Load persistent queue records into Streamlit state."""
+
+    initialise_queue_database()
+    saved_queue = load_review_queue()
+
+    st.session_state.setdefault("message_input", "")
+    st.session_state["review_queue"] = saved_queue
+    st.session_state["queue_counter"] = max(
+        (
+            item["sequence"]
+            for item in saved_queue
+        ),
+        default=0,
+    )
+
+
+def create_message_id(message):
+    """Create an anonymous identifier without storing message text."""
+
     return hashlib.sha256(
         message.encode("utf-8")
     ).hexdigest()[:12]
+
+
+def protect_csv_cell(value):
+    """Prevent spreadsheet programs from executing a text value."""
+
+    text = str(value).strip()
+
+    if text.startswith(("=", "+", "-", "@")):
+        return "'" + text
+
+    return text
 
 
 def save_human_decision(
@@ -341,15 +544,21 @@ def save_human_decision(
             timezone.utc
         ).isoformat(),
         "message_id": message_id,
-        "raw_model_category": raw_model_category,
-        "ai_recommendation": recommended_category,
-        "model_confidence": round(confidence, 4),
-        "safety_rule_triggered": safety_triggered,
-        "human_final_category": final_category,
+        "raw_model_category": protect_csv_cell(
+            raw_model_category
+        ),
+        "ai_recommendation": protect_csv_cell(
+            recommended_category
+        ),
+        "model_confidence": round(float(confidence), 4),
+        "safety_rule_triggered": bool(safety_triggered),
+        "human_final_category": protect_csv_cell(
+            final_category
+        ),
         "human_changed_recommendation": (
             final_category != recommended_category
         ),
-        "human_reason": officer_reason,
+        "human_reason": protect_csv_cell(officer_reason),
     }
 
     with AUDIT_LOG_PATH.open(
@@ -370,519 +579,604 @@ def save_human_decision(
     return message_id
 
 
-def load_example(example_message):
-    """
-    Places a fictional example into the message box.
+def clear_current_case():
+    """Clear the current case while preserving the review queue."""
 
-    Any previous assessment is removed.
-    """
-    st.session_state["message_input"] = example_message
-    st.session_state.pop("triage_result", None)
-    st.session_state.pop("assessed_message", None)
-
-
-def clear_case():
-    """Clears the current demonstration case."""
     st.session_state["message_input"] = ""
     st.session_state.pop("triage_result", None)
     st.session_state.pop("assessed_message", None)
+    st.session_state.pop("active_case_id", None)
 
 
-def confidence_description(confidence):
-    """
-    Converts a numeric confidence value into understandable text.
+def load_example(example_message):
+    """Load one fictional example into the message field."""
 
-    Confidence is not the same as safety.
-    """
-    if confidence >= 0.75:
-        return "Higher model confidence"
-    if confidence >= 0.50:
-        return "Moderate model confidence"
-    return "Low model confidence"
+    st.session_state["message_input"] = example_message
+    st.session_state.pop("triage_result", None)
+    st.session_state.pop("assessed_message", None)
+    st.session_state.pop("active_case_id", None)
 
 
-# =========================================================
-# 5. SIDEBAR
-# =========================================================
-with st.sidebar:
-    st.markdown("## 🛡️ PriorityLink")
-    st.caption("Trusted message-triage prototype")
+def add_to_review_queue(result):
+    """Add an assessed message to the persistent review queue."""
 
-    st.divider()
+    st.session_state["queue_counter"] += 1
+    sequence = st.session_state["queue_counter"]
+    case_id = f"CASE-{sequence:03d}"
 
-    st.markdown("### Decision process")
+    queue_item = {
+        "case_id": case_id,
+        "sequence": sequence,
+        "message": result["message"],
+        "category": str(result["recommended_category"]),
+        "confidence": float(result["model_confidence"]),
+        "safety_triggered": bool(
+            result["safety_rule_triggered"]
+        ),
+        "status": "Awaiting review",
+        "final_category": "",
+        "result": result,
+    }
 
-    st.markdown(
-        """
-        **1. Receive**  
-        A fictional public message is entered.
+    save_queue_item(queue_item)
+    st.session_state["review_queue"].append(queue_item)
+    return case_id
 
-        **2. Assess**  
-        The text model and safety rules examine it.
 
-        **3. Explain**  
-        The officer sees the recommendation and reasons.
+def queue_sort_key(item):
+    """Sort waiting cases by priority and then arrival order."""
 
-        **4. Decide**  
-        A human confirms or changes the category.
-        """
+    reviewed_rank = (
+        1 if item["status"] == "Reviewed" else 0
     )
 
-    st.divider()
-
-    st.markdown("### System safeguards")
-
-    st.success("Human decision required")
-    st.info("Transparent safety rules")
-    st.info("No automatic public response")
-    st.info("Anonymous audit identifier")
-
-    st.divider()
-
-    st.markdown("### Prototype model")
-
-    st.caption("TF-IDF + Logistic Regression")
-    st.caption("Synthetic training messages")
-    st.caption("Four recommendation categories")
-
-    st.divider()
-
-    st.button(
-        "Clear current case",
-        on_click=clear_case,
-        use_container_width=True,
+    return (
+        reviewed_rank,
+        PRIORITY_ORDER.get(item["category"], 99),
+        item["sequence"],
     )
 
 
-# =========================================================
-# 6. HERO SECTION
-# =========================================================
-hero_html = """
-<div class="hero">
-  <div class="brand-line">TRUSTED AI DECISION SUPPORT</div>
-  <h1>Urgent Message Router</h1>
-  <p>Helps correspondence officers identify messages that may require urgent human attention—without allowing AI to make the final decision.</p>
-  <div class="stat-grid">
-    <div class="stat-card">
-      <div class="stat-value">95%</div>
-      <div class="stat-label">Critical recall with safety layer*</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-value">4</div>
-      <div class="stat-label">Transparent triage categories</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-value">Human</div>
-      <div class="stat-label">Final decision-maker</div>
-    </div>
-  </div>
-</div>
-"""
+def waiting_cases():
+    """Return waiting messages in operational priority order."""
+
+    cases = [
+        item
+        for item in st.session_state["review_queue"]
+        if item["status"] == "Awaiting review"
+    ]
+
+    return sorted(cases, key=queue_sort_key)
+
+
+def find_case(case_id):
+    """Find a case in the currently loaded queue."""
+
+    for item in st.session_state["review_queue"]:
+        if item["case_id"] == case_id:
+            return item
+
+    return None
+
+
+def mark_case_reviewed(case_id, final_category):
+    """Update the status of a human-reviewed case."""
+
+    case = find_case(case_id)
+
+    if case is not None:
+        save_review_status(case_id, final_category)
+        case["status"] = "Reviewed"
+        case["final_category"] = final_category
+
+
+def open_next_waiting_case():
+    """Open the highest-priority case waiting for review."""
+
+    cases = waiting_cases()
+
+    if not cases:
+        return
+
+    next_case = cases[0]
+
+    st.session_state["message_input"] = next_case["message"]
+    st.session_state["triage_result"] = next_case["result"]
+    st.session_state["assessed_message"] = next_case["message"]
+    st.session_state["active_case_id"] = next_case["case_id"]
+
+
+def queue_position(case_id):
+    """Return a waiting case's current queue position."""
+
+    for position, item in enumerate(
+        waiting_cases(),
+        start=1,
+    ):
+        if item["case_id"] == case_id:
+            return position
+
+    return None
+
+
+def message_preview(message, maximum_length=68):
+    """Create a short single-line queue preview."""
+
+    preview = " ".join(str(message).split())
+
+    if len(preview) <= maximum_length:
+        return preview
+
+    return preview[: maximum_length - 1].rstrip() + "…"
+
+
+initialise_state()
+
+
+# -----------------------------------------------------------------------------
+# Header
+# -----------------------------------------------------------------------------
+
+st.title("PriorityLink")
 
 st.markdown(
-    hero_html,
+    """
+    <p class="app-intro">
+        Assess incoming messages, prioritise the human-review queue,
+        and record the officer's final decision.
+    </p>
+    """,
     unsafe_allow_html=True,
 )
 
 st.caption(
-    "*Prototype result from the 80-message synthetic validation dataset; "
-    "not evidence of real-world performance."
+    "Student prototype using fictional messages only. "
+    "It is not an emergency service, and the human officer remains "
+    "responsible for every final decision."
 )
 
-st.error(
-    "Emergency notice: This student prototype is not an emergency "
-    "service. In Australia, call 000 when life or property is in "
-    "immediate danger. Enter fictional messages only."
+flash_message = st.session_state.pop("flash_message", None)
+
+if flash_message:
+    st.success(flash_message)
+
+st.divider()
+
+
+# -----------------------------------------------------------------------------
+# Message intake and live queue
+# -----------------------------------------------------------------------------
+
+input_column, queue_column = st.columns(
+    [0.9, 1.1],
+    gap="large",
 )
 
+with input_column:
+    st.subheader("New message")
+    st.caption("Enter a fictional message or load a test example.")
 
-# =========================================================
-# 7. MESSAGE INPUT
-# =========================================================
-st.markdown("## New message assessment")
-st.write(
-    "Enter a fictional message or select an example to demonstrate "
-    "the different pathways."
-)
+    example_column1, example_column2 = st.columns(2)
 
-example_column1, example_column2, example_column3 = st.columns(3)
+    with example_column1:
+        st.button(
+            "Critical example",
+            on_click=load_example,
+            args=(EXAMPLE_MESSAGES["Critical"],),
+            use_container_width=True,
+        )
 
-with example_column1:
-    st.button(
-        "🚨 Critical example",
-        on_click=load_example,
-        args=(
-            "A child has fallen into the water tank "
-            "and is not responding.",
-        ),
-        use_container_width=True,
+        st.button(
+            "Routine example",
+            on_click=load_example,
+            args=(EXAMPLE_MESSAGES["Routine"],),
+            use_container_width=True,
+        )
+
+    with example_column2:
+        st.button(
+            "Urgent example",
+            on_click=load_example,
+            args=(EXAMPLE_MESSAGES["Urgent"],),
+            use_container_width=True,
+        )
+
+        st.button(
+            "Uncertain example",
+            on_click=load_example,
+            args=(EXAMPLE_MESSAGES["Uncertain"],),
+            use_container_width=True,
+        )
+
+    message = st.text_area(
+        "Fictional incoming message",
+        key="message_input",
+        height=150,
+        max_chars=MAXIMUM_MESSAGE_LENGTH,
+        placeholder="Describe the fictional situation here.",
     )
 
-with example_column2:
-    st.button(
-        "⚠️ Urgent example",
-        on_click=load_example,
-        args=(
-            "Our only toilet is blocked and overflowing "
-            "onto the floor.",
-        ),
-        use_container_width=True,
-    )
-
-with example_column3:
-    st.button(
-        "❓ Uncertain example",
-        on_click=load_example,
-        args=(
-            "Something happened near my house and "
-            "I need someone to help.",
-        ),
-        use_container_width=True,
-    )
-
-message = st.text_area(
-    "Fictional incoming message",
-    key="message_input",
-    height=160,
-    max_chars=5000,
-    placeholder=(
-        "Describe the fictional situation here. "
-        "Do not enter real personal information."
-    ),
-)
-
-character_column, privacy_column = st.columns([1, 3])
-
-with character_column:
-    st.caption(f"{len(message):,} / 5,000 characters")
-
-with privacy_column:
     st.caption(
-        "Privacy by design: the full message is not written "
-        "to the decision audit log."
+        f"{len(message):,} / {MAXIMUM_MESSAGE_LENGTH:,} characters · "
+        "Saved locally for queue and status tracking."
     )
 
-assess_message = st.button(
-    "Analyse and route message",
-    type="primary",
-    use_container_width=True,
-)
-
-
-# =========================================================
-# 8. RUN MODEL AND SAFETY RULES
-# =========================================================
-if assess_message:
-    if not message.strip():
-        st.error("Enter a fictional message before assessment.")
-    else:
-        try:
-            with st.spinner(
-                "Running the text model and safety checks..."
-            ):
-                assessment = triage_message(message)
-
-            st.session_state["triage_result"] = assessment
-            st.session_state["assessed_message"] = message
-
-        except (
-            ValueError,
-            TypeError,
-            FileNotFoundError,
-        ) as error:
-            st.error(
-                f"The assessment could not be completed: {error}"
-            )
-
-
-# =========================================================
-# 9. DISPLAY RECOMMENDATION
-# =========================================================
-if "triage_result" in st.session_state:
-    result = st.session_state["triage_result"]
-    assessed_message = st.session_state[
-        "assessed_message"
-    ]
-
-    recommended_category = result[
-        "recommended_category"
-    ]
-
-    raw_category = result["model_category"]
-    confidence = float(result["model_confidence"])
-
-    safety_triggered = result[
-        "safety_rule_triggered"
-    ]
-
-    style = CATEGORY_STYLES[recommended_category]
-
-    st.divider()
-    st.markdown("## Assessment result")
-
-    risk_card_html = f"""
-<div class="risk-card {style["css_class"]}">
-  <div class="risk-heading">{style["icon"]} {recommended_category}: {style["title"]}</div>
-  <div class="risk-description">{style["description"]}</div>
-  <div class="route-pill">Route: {style["route"]}</div>
-</div>
-"""
-
-    st.markdown(
-        risk_card_html,
-        unsafe_allow_html=True,
+    assess_message = st.button(
+        "Assess and add to queue",
+        type="primary",
+        use_container_width=True,
     )
 
-    metric1, metric2, metric3, metric4 = st.columns(4)
+    if assess_message:
+        if not message.strip():
+            st.error("Enter a fictional message before assessment.")
+
+        else:
+            try:
+                with st.spinner("Assessing message..."):
+                    assessment = triage_message(message)
+
+                case_id = add_to_review_queue(assessment)
+
+                st.session_state["triage_result"] = assessment
+                st.session_state["assessed_message"] = assessment[
+                    "message"
+                ]
+                st.session_state["active_case_id"] = case_id
+
+            except (
+                ValueError,
+                TypeError,
+                FileNotFoundError,
+            ) as error:
+                st.error(
+                    f"The assessment could not be completed: {error}"
+                )
+
+            except Exception:
+                st.error(
+                    "The assessment could not be completed. Check the "
+                    "model files and try again."
+                )
+
+    if "triage_result" in st.session_state:
+        st.button(
+            "Start another message",
+            on_click=clear_current_case,
+            use_container_width=True,
+        )
+
+
+with queue_column:
+    st.subheader("Human-review queue")
+    st.caption(
+        "Waiting messages are ordered Critical, Urgent, Uncertain, "
+        "then Routine."
+    )
+
+    waiting = waiting_cases()
+    reviewed = [
+        item
+        for item in st.session_state["review_queue"]
+        if item["status"] == "Reviewed"
+    ]
+
+    metric1, metric2, metric3 = st.columns(3)
 
     with metric1:
         st.metric(
-            "AI recommendation",
-            recommended_category,
+            "Critical waiting",
+            sum(
+                item["category"] == "Critical"
+                for item in waiting
+            ),
         )
 
     with metric2:
         st.metric(
-            "Raw model output",
-            raw_category,
+            "Urgent waiting",
+            sum(
+                item["category"] == "Urgent"
+                for item in waiting
+            ),
         )
 
     with metric3:
-        st.metric(
-            "Model confidence",
-            f"{confidence:.1%}",
+        st.metric("Total waiting", len(waiting))
+
+    if not st.session_state["review_queue"]:
+        st.info(
+            "The queue is empty. Assess a message to create the "
+            "first case."
         )
 
-    with metric4:
-        st.metric(
-            "Safety rule",
-            "Triggered" if safety_triggered else "Not triggered",
+    else:
+        ordered_cases = waiting + sorted(
+            reviewed,
+            key=lambda item: item["sequence"],
+            reverse=True,
         )
 
-    st.caption(
-        confidence_description(confidence)
-        + ". Confidence describes the model prediction; "
-        + "it does not prove that the message is safe."
+        queue_rows = []
+        waiting_position = 0
+
+        for item in ordered_cases:
+            if item["status"] == "Awaiting review":
+                waiting_position += 1
+                displayed_position = waiting_position
+            else:
+                displayed_position = "Done"
+
+            queue_rows.append(
+                {
+                    "Position": displayed_position,
+                    "Case": item["case_id"],
+                    "Priority": item["category"],
+                    "Message": message_preview(item["message"]),
+                    "Status": item["status"],
+                }
+            )
+
+        st.dataframe(
+            queue_rows,
+            hide_index=True,
+            use_container_width=True,
+            height=min(330, 38 * len(queue_rows) + 38),
+        )
+
+        if waiting:
+            st.button(
+                "Open next priority message",
+                type="primary",
+                on_click=open_next_waiting_case,
+                use_container_width=True,
+            )
+
+# -----------------------------------------------------------------------------
+# Current assessment and officer decision
+# -----------------------------------------------------------------------------
+
+if "triage_result" in st.session_state:
+    result = st.session_state["triage_result"]
+    assessed_message = st.session_state["assessed_message"]
+    current_input = " ".join(
+        st.session_state["message_input"].split()
     )
 
-    if safety_triggered:
-        st.error(
-            "Safety intervention: An explicit danger indicator was "
-            "detected. The message has been raised for immediate "
-            "human review."
+    if current_input != assessed_message:
+        st.info(
+            "The message text has changed. Select "
+            "'Assess and add to queue' to create a new assessment."
         )
 
-    if result.get("low_confidence", confidence < 0.50):
-        st.warning(
-            "Low-confidence warning: The officer should inspect the "
-            "message especially carefully."
+    else:
+        recommended_category = str(
+            result["recommended_category"]
+        )
+        raw_category = str(result["model_category"])
+        confidence = float(result["model_confidence"])
+        safety_triggered = bool(
+            result["safety_rule_triggered"]
+        )
+        style = CATEGORY_STYLES.get(
+            recommended_category,
+            CATEGORY_STYLES["Uncertain"],
         )
 
-    result_column1, result_column2 = st.columns(
-        [1.15, 0.85],
-        gap="large",
-    )
+        active_case_id = st.session_state.get(
+            "active_case_id"
+        )
+        active_case = find_case(active_case_id)
+        position = queue_position(active_case_id)
 
-    # -----------------------------------------------------
-    # Explanation panel
-    # -----------------------------------------------------
-    with result_column1:
-        with st.container(border=True):
-            st.markdown("### Why did the system recommend this?")
+        if active_case and active_case["status"] == "Reviewed":
+            queue_status = "Review complete"
+        elif position is not None:
+            queue_status = f"Queue position {position}"
+        else:
+            queue_status = "Awaiting human review"
+
+        st.divider()
+        st.subheader("Current case")
+
+        recommendation_html = f"""
+        <div class="priority-card {style['css_class']}">
+            <div class="priority-label">
+                {recommended_category.upper()}
+            </div>
+            <div class="priority-heading">
+                {style['heading']}
+            </div>
+            <div class="priority-description">
+                {style['description']}
+            </div>
+            <div class="priority-meta">
+                {active_case_id} · {queue_status} · {style['route']}
+            </div>
+        </div>
+        """
+
+        st.markdown(
+            recommendation_html,
+            unsafe_allow_html=True,
+        )
+
+        result_metric1, result_metric2, result_metric3 = (
+            st.columns(3)
+        )
+
+        with result_metric1:
+            st.metric("Raw model output", raw_category)
+
+        with result_metric2:
+            st.metric(
+                "Model confidence",
+                f"{confidence:.1%}",
+            )
+
+        with result_metric3:
+            st.metric(
+                "Safety rule",
+                (
+                    "Triggered"
+                    if safety_triggered
+                    else "Not triggered"
+                ),
+            )
+
+        st.caption(
+            "Confidence describes the statistical model only; it "
+            "does not prove that a message is safe or correct."
+        )
+
+        if safety_triggered:
+            st.error(
+                "An explicit danger indicator triggered immediate "
+                "human review."
+            )
+
+        elif result.get("low_confidence", confidence < 0.50):
+            st.warning(
+                "The model evidence is weak. The message has been "
+                "sent for human clarification."
+            )
+
+        with st.expander("Assessment details"):
+            source = result.get(
+                "recommendation_source",
+                "machine_learning_model",
+            )
+
+            source_names = {
+                "critical_safety_rule": "Critical safety rule",
+                "safety_rule": "Critical safety rule",
+                "low_confidence_fallback": (
+                    "Low-confidence fallback"
+                ),
+                "machine_learning_model": (
+                    "Machine-learning model"
+                ),
+            }
+
+            st.write(
+                "**Recommendation source:**",
+                source_names.get(
+                    source,
+                    source.replace("_", " ").title(),
+                ),
+            )
 
             explanations = result.get("explanation", [])
 
-            if explanations:
-                for explanation in explanations:
-                    st.markdown(f"- {explanation}")
-            else:
-                st.write(
-                    "No explanation was returned. "
-                    "Human review is still required."
+            for explanation in explanations:
+                st.write(f"- {explanation}")
+
+            safety_reasons = result.get(
+                "safety_reasons",
+                [],
+            )
+
+            if safety_reasons:
+                st.write("**Matched safety indicators:**")
+
+                for reason in safety_reasons:
+                    st.write(f"- {reason}")
+
+            probabilities = result.get("probabilities", {})
+
+            if probabilities:
+                probability_rows = [
+                    {
+                        "Category": category,
+                        "Probability": (
+                            f"{float(probabilities.get(category, 0)):.1%}"
+                        ),
+                    }
+                    for category in CATEGORIES
+                ]
+
+                st.write("**Model probability breakdown:**")
+                st.dataframe(
+                    probability_rows,
+                    hide_index=True,
+                    use_container_width=True,
                 )
 
-            st.markdown(
-                """
-                <div class="privacy-note">
-                    The recommendation supports the officer—it does
-                    not approve, reject or automatically answer the
-                    sender.
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+        st.subheader("Officer decision")
 
-    # -----------------------------------------------------
-    # Probability panel
-    # -----------------------------------------------------
-    with result_column2:
-        with st.container(border=True):
-            st.markdown("### Model probability comparison")
-
-            probabilities = result.get(
-                "probabilities",
-                {},
-            )
-
-            for category in CATEGORIES:
-                probability = float(
-                    probabilities.get(category, 0.0)
-                )
-
-                label_column, score_column = st.columns(
-                    [2, 1]
-                )
-
-                with label_column:
-                    st.write(category)
-
-                with score_column:
-                    st.write(f"**{probability:.1%}**")
-
-                st.progress(
-                    int(round(probability * 100))
-                )
-
-    with st.expander("View technical assessment details"):
-        st.write(
-            "**Raw model category:**",
-            raw_category,
-        )
-
-        st.write(
-            "**Final AI recommendation:**",
-            recommended_category,
-        )
-
-        st.write(
-            "**Safety rule triggered:**",
-            safety_triggered,
-        )
-
-        safety_reasons = result.get(
-            "safety_reasons",
-            [],
-        )
-
-        if safety_reasons:
-            st.write("**Safety indicators:**")
-
-            for reason in safety_reasons:
-                st.write(f"- {reason}")
-        else:
-            st.write(
-                "**Safety indicators:** "
-                "No explicit rule matched."
-            )
-
-        st.warning(
-            "No rule match does not guarantee that a message is safe."
-        )
-
-
-    # =====================================================
-    # 10. HUMAN DECISION
-    # =====================================================
-    st.divider()
-    st.markdown("## Human review and final decision")
-
-    st.write(
-        "The officer must review the original message, the AI "
-        "recommendation and the reasons before recording a decision."
-    )
-
-    message_id = create_message_id(assessed_message)
-    default_category_index = CATEGORIES.index(
-        recommended_category
-    )
-
-    with st.form(
-        key=f"human_decision_{message_id}"
-    ):
-        form_column1, form_column2 = st.columns(2)
-
-        with form_column1:
-            final_category = st.selectbox(
-                "Human-selected final category",
-                options=CATEGORIES,
-                index=default_category_index,
-            )
-
-        with form_column2:
-            demonstration_officer = st.text_input(
-                "Demonstration officer ID",
-                value="DEMO-OFFICER-01",
-                disabled=True,
-            )
-
-        officer_reason = st.text_area(
-            "Reason for confirming or changing the recommendation",
-            placeholder=(
-                "Example: I confirmed Critical because the message "
-                "describes a child in immediate danger."
-            ),
-            height=120,
-        )
-
-        review_confirmed = st.checkbox(
-            "I confirm that I reviewed the original message, "
-            "the recommendation and the explanation."
-        )
-
-        submit_decision = st.form_submit_button(
-            "Record human decision",
-            type="primary",
-            use_container_width=True,
-        )
-
-    if submit_decision:
-        if not officer_reason.strip():
-            st.error(
-                "A reason is required for accountability."
-            )
-
-        elif not review_confirmed:
-            st.error(
-                "Confirm that you completed the human review."
-            )
-
-        else:
-            saved_message_id = save_human_decision(
-                message=assessed_message,
-                raw_model_category=raw_category,
-                recommended_category=recommended_category,
-                confidence=confidence,
-                safety_triggered=safety_triggered,
-                final_category=final_category,
-                officer_reason=officer_reason.strip(),
-            )
-
+        if active_case and active_case["status"] == "Reviewed":
             st.success(
-                "Human decision recorded successfully. "
-                f"Anonymous case ID: {saved_message_id}"
+                "This case was reviewed and recorded as "
+                f"{active_case['final_category']}."
             )
 
-            if final_category != recommended_category:
-                st.info(
-                    "The human officer overrode the AI recommendation. "
-                    "The reason was recorded for later review."
-                )
-            else:
-                st.info(
-                    "The human officer confirmed the recommendation. "
-                    "The officer—not the AI—remains accountable."
+        else:
+            default_category_index = CATEGORIES.index(
+                recommended_category
+            )
+
+            with st.form(
+                key=f"human_decision_{active_case_id}"
+            ):
+                final_category = st.selectbox(
+                    "Final category",
+                    options=CATEGORIES,
+                    index=default_category_index,
                 )
 
+                officer_reason = st.text_area(
+                    "Reason for the decision",
+                    placeholder=(
+                        "Briefly explain why the recommendation was "
+                        "confirmed or changed."
+                    ),
+                    height=100,
+                    max_chars=500,
+                )
 
-# =========================================================
-# 11. FOOTER
-# =========================================================
-st.markdown(
-    """
-    <div class="footer-note">
-        PriorityLink • CDU IT Code Fair 2026 student prototype<br>
-        Synthetic data only • AI recommends • A human decides
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+                review_confirmed = st.checkbox(
+                    "I reviewed the message, recommendation and "
+                    "explanation."
+                )
+
+                submit_decision = st.form_submit_button(
+                    "Record human decision",
+                    type="primary",
+                    use_container_width=True,
+                )
+
+            if submit_decision:
+                if not officer_reason.strip():
+                    st.error(
+                        "Enter a short reason for accountability."
+                    )
+
+                elif not review_confirmed:
+                    st.error(
+                        "Confirm that the human review was completed."
+                    )
+
+                else:
+                    saved_message_id = save_human_decision(
+                        message=assessed_message,
+                        raw_model_category=raw_category,
+                        recommended_category=(
+                            recommended_category
+                        ),
+                        confidence=confidence,
+                        safety_triggered=safety_triggered,
+                        final_category=final_category,
+                        officer_reason=officer_reason.strip(),
+                    )
+
+                    mark_case_reviewed(
+                        active_case_id,
+                        final_category,
+                    )
+
+                    st.session_state["flash_message"] = (
+                        "Human decision recorded. "
+                        f"Anonymous audit ID: {saved_message_id}"
+                    )
+
+                    st.rerun()
